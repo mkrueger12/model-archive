@@ -1,27 +1,25 @@
-FROM cgr.dev/chainguard/python:latest-dev AS builder
+FROM cgr.dev/chainguard/wolfi-base
 
-ENV LANG=C.UTF-8
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
-ENV PATH="/home/nonroot/venv/bin:$PATH"
+ARG version=3.12
 
-WORKDIR /home/nonroot/app
-RUN python -m venv /home/nonroot/venv
+WORKDIR /app
+
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
 
-FROM cgr.dev/chainguard/python:latest
+RUN apk upgrade --no-cache
+RUN apk add --no-cache python-${version} py${version}-pip && \
+    pip install --upgrade pip && \
+    pip install -r requirements.txt && \
+    apk del py${version}-pip && \
+    chown -R nonroot:nonroot /app
 
-WORKDIR /home/nonroot/app
-ENV LANG=C.UTF-8
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
-ENV PATH="/home/nonroot/venv/bin:$PATH"
+COPY . .
 
-# Expose the port Streamlit runs on
+USER nonroot
+
 EXPOSE 8501
 
-COPY --from=builder /home/nonroot/venv /home/nonroot/venv
-COPY . /home/nonroot/app/
+# Use exec form of ENTRYPOINT for proper signal handling
+ENTRYPOINT ["streamlit", "run", "main.py", "--browser.gatherUsageStats=false", "--server.port=8501", "--server.address=0.0.0.0"]
 
-ENTRYPOINT [ "/home/nonroot/venv/bin/streamlit", "run", "/home/nonroot/app/main.py" ]
+
